@@ -10,6 +10,7 @@ Requiere la variable de entorno MP_TICKET (ticket de la API de Mercado Público)
 import csv
 import datetime as dt
 import os
+import re
 import shutil
 import sys
 import time
@@ -39,7 +40,7 @@ COLUMNAS = [
     ("Codigo", 18), ("Nombre", 60), ("Estado", 12), ("Tipo", 8), ("Organismo", 40),
     ("Unidad", 30), ("Region", 22), ("Comuna", 18), ("FechaPublicacion", 18),
     ("FechaCierre", 18), ("MontoEstimado", 16), ("Moneda", 8), ("Descripcion", 80),
-    ("PalabrasCalzadas", 30), ("URL", 50),
+    ("ServicioDATAELECT", 30), ("PalabrasCalzadas", 30), ("URL", 50),
 ]
 CAMPOS_HIST = ["Codigo", "Nombre", "Organismo", "Region", "FechaCierre", "Estado",
                "PrimeraVez", "UltimaVez"]
@@ -70,11 +71,25 @@ def get_json(params, ticket, intentos=4):
     raise RuntimeError(f"La API no respondió correctamente tras {intentos} intentos: {params.get('codigo') or params}")
 
 
+_SERVICIOS = {srv: [re.compile(r"\b" + p) for p in pats] for srv, pats in config.SERVICIOS.items()}
+_EXCLUIDOS = [re.compile(r"\b" + p) for p in config.PATRONES_EXCLUIDOS]
+
+
 def calza(texto):
-    t = normalizar(texto)
-    if any(normalizar(x) in t for x in config.PALABRAS_EXCLUIDAS):
-        return []
-    return [p for p in config.PALABRAS_CLAVE if normalizar(p) in t]
+    """Devuelve {servicio: [términos encontrados]} según los servicios de config.py."""
+    t = " ".join(normalizar(texto).split())
+    if any(rx.search(t) for rx in _EXCLUIDOS):
+        return {}
+    out = {}
+    for srv, regs in _SERVICIOS.items():
+        hallados = []
+        for rx in regs:
+            m = rx.search(t)
+            if m and m.group(0).strip() not in hallados:
+                hallados.append(m.group(0).strip())
+        if hallados:
+            out[srv] = hallados
+    return out
 
 
 def fila_desde_detalle(lic, palabras):
@@ -95,7 +110,8 @@ def fila_desde_detalle(lic, palabras):
         "MontoEstimado": lic.get("MontoEstimado") or "",
         "Moneda": lic.get("Moneda", ""),
         "Descripcion": (lic.get("Descripcion") or "").strip(),
-        "PalabrasCalzadas": ", ".join(palabras),
+        "ServicioDATAELECT": " | ".join(palabras),
+        "PalabrasCalzadas": ", ".join(sorted({w for v in palabras.values() for w in v}))[:200],
         "URL": f"https://www.mercadopublico.cl/Procurement/Modules/RFB/DetailsAcquisition.aspx?idlicitacion={codigo}",
     }
 
@@ -210,11 +226,18 @@ def escribir_excel(filas, ruta):
             ws.cell(row=i, column=j).alignment = Alignment(wrap_text=True, vertical="top")
     ws.freeze_panes = "B2"
     ws.auto_filter.ref = ws.dimensions
+    res = wb.create_sheet("Por servicio")
+    res.append(["Servicio DATAELECT", "Licitaciones"])
+    for srv in config.SERVICIOS:
+        res.append([srv, sum(srv in str(f.get("ServicioDATAELECT", "")) for f in filas)])
+    res.column_dimensions["A"].width = 36
+    for c in res[1]:
+        c.font = Font(bold=True)
     info = wb.create_sheet("Info")
     info.append(["Generado", ahora().strftime("%Y-%m-%d %H:%M")])
     info.append(["Fuente", "API Mercado Público (ChileCompra)"])
     info.append(["Estado consultado", config.ESTADO])
-    info.append(["Palabras clave", ", ".join(config.PALABRAS_CLAVE)])
+    info.append(["Servicios filtrados", ", ".join(config.SERVICIOS)])
     info.append(["Total", len(filas)])
     wb.save(ruta)
 

@@ -25,8 +25,8 @@ Siempre se actualizan:
 ## Ajustar filtros
 
 Edita `scripts/config.py`:
-- `PALABRAS_CLAVE`: rubros que te interesan.
-- `PALABRAS_EXCLUIDAS`: para descartar ruido.
+- `SERVICIOS`: las líneas de servicio de DATAELECT (eléctrica y potencia, telecomunicaciones, control e instrumentación, estructural, construcción y montaje, dibujo técnico, traducción y capacitación), cada una con sus términos de búsqueda. El Excel indica en qué servicio calzó cada licitación y trae una hoja de resumen por servicio.
+- `PATRONES_EXCLUIDOS`: para descartar ruido (por ejemplo, "tablero sensorial" o equipos médicos).
 - `REGIONES`: si la dejas vacía, incluye todo Chile.
 - `ESTADO`: por defecto `activas`.
 
