@@ -47,15 +47,30 @@ COLORES = ["BLUE", "GREEN", "PURPLE", "GRAY", "ORANGE", "PINK", "YELLOW", "RED"]
 
 
 def gql(query, **variables):
-    for intento in range(5):
-        r = requests.post(API, json={"query": query, "variables": variables},
-                          headers={"Authorization": f"Bearer {TOKEN}"}, timeout=60)
-        if r.status_code in (502, 503) or (r.status_code == 403 and "rate" in r.text.lower()):
-            time.sleep(10 * (intento + 1))
+    for intento in range(6):
+        try:
+            r = requests.post(API, json={"query": query, "variables": variables},
+                              headers={"Authorization": f"Bearer {TOKEN}"}, timeout=60)
+        except requests.RequestException as e:
+            print(f"  red: {e}; reintentando", flush=True)
+            time.sleep(15 * (intento + 1))
             continue
-        datos = r.json()
+        texto = r.text.lower()
+        limite = ("rate limit" in texto or "too quickly" in texto or "abuse" in texto
+                  or r.status_code == 429)
+        if r.status_code in (500, 502, 503, 504) or limite:
+            espera = int(r.headers.get("Retry-After", 0) or 0) or (60 if limite else 10) * (intento + 1)
+            print(f"  GitHub pide esperar ({r.status_code}); pausa de {espera}s", flush=True)
+            time.sleep(espera)
+            continue
+        try:
+            datos = r.json()
+        except ValueError:
+            raise RuntimeError(f"Respuesta no válida de GitHub (HTTP {r.status_code}): {r.text[:300]}")
+        if r.status_code == 401:
+            raise RuntimeError("Token rechazado (401): revisa el secreto PROJECT_TOKEN.")
         if datos.get("errors"):
-            raise RuntimeError(datos["errors"])
+            raise RuntimeError(f"HTTP {r.status_code}: {datos['errors']}")
         return datos["data"]
     raise RuntimeError("GitHub no respondió")
 
@@ -129,6 +144,20 @@ def valor_campo(campo, fila):
     return None
 
 
+def escribir_log(titulo, total, previas, ok, errores):
+    """Deja constancia en el repo (datos/proyecto_log.md) de cada publicación en el tablero."""
+    ruta = os.path.join(os.path.dirname(__file__), "..", "datos", "proyecto_log.md")
+    nuevo = not os.path.exists(ruta)
+    with open(ruta, "a", encoding="utf-8") as fh:
+        if nuevo:
+            fh.write("# Publicaciones en GitHub Project\n\n")
+        fh.write(f"## {time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime())} · {titulo}\n"
+                 f"- En archivo: {total} · ya en tablero: {previas} · agregadas: {ok} · errores: {len(errores)}\n")
+        for e in errores[:30]:
+            fh.write(f"  - {e[:400]}\n")
+        fh.write("\n")
+
+
 def cuerpo(f):
     monto = f.get("MontoEstimado") or "no informado"
     return (
@@ -167,26 +196,44 @@ def main(ruta_csv):
       addProjectV2DraftIssue(input:{projectId:$pid,title:$t,body:$b}){ projectItem{ id } } }"""
     upd = """mutation($pid:ID!,$item:ID!,$field:ID!,$v:ProjectV2FieldValue!){
       updateProjectV2ItemFieldValue(input:{projectId:$pid,itemId:$item,fieldId:$field,value:$v}){ clientMutationId } }"""
+    errores, ok = [], 0
     for i, f in enumerate(nuevas, 1):
         titulo = f"[{f['Codigo']}] {f.get('Nombre','').strip()}"[:250]
-        item = gql(add, pid=p["id"], t=titulo, b=cuerpo(f))["addProjectV2DraftIssue"]["projectItem"]["id"]
-        for c in campos:
-            v = valor_campo(c, f)
-            if v:
-                gql(upd, pid=p["id"], item=item, field=c["id"], v=v)
-        if op_status:
-            gql(upd, pid=p["id"], item=item, field=status["id"], v={"singleSelectOptionId": op_status["id"]})
+        try:
+            item = gql(add, pid=p["id"], t=titulo, b=cuerpo(f))["addProjectV2DraftIssue"]["projectItem"]["id"]
+            for c in campos:
+                v = valor_campo(c, f)
+                if v:
+                    try:
+                        gql(upd, pid=p["id"], item=item, field=c["id"], v=v)
+                    except RuntimeError as e:
+                        errores.append(f"{f['Codigo']} campo {c['name']}: {e}")
+            if op_status:
+                gql(upd, pid=p["id"], item=item, field=status["id"], v={"singleSelectOptionId": op_status["id"]})
+            ok += 1
+        except RuntimeError as e:
+            errores.append(f"{f['Codigo']}: {e}")
+            if len(errores) >= 15 and ok == 0:
+                break  # error sistemático: no insistir
         if i % 20 == 0:
-            print(f"  {i}/{len(nuevas)}")
+            print(f"  {i}/{len(nuevas)}", flush=True)
         time.sleep(1.0)  # respeta el límite de GitHub (~80 creaciones por minuto)
-    print(f"Listo: {len(nuevas)} tarjetas agregadas al proyecto.")
+    nuevas = nuevas[:ok] if ok else []
+    print(f"Listo: {ok} tarjetas agregadas al proyecto; {len(errores)} errores.")
+    escribir_log(p["title"], len(filas), len(ya), ok, errores)
     resumen = os.environ.get("GITHUB_STEP_SUMMARY")
     if resumen:
         with open(resumen, "a", encoding="utf-8") as fh:
-            fh.write(f"### GitHub Project «{p['title']}»\n- Tarjetas nuevas: {len(nuevas)}\n")
+            fh.write(f"### GitHub Project «{p['title']}»\n- Tarjetas nuevas: {ok}\n- Errores: {len(errores)}\n")
+            for e in errores[:20]:
+                fh.write(f"  - {e[:300]}\n")
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         sys.exit("Uso: python scripts/proyecto.py <archivo.csv>")
-    main(sys.argv[1])
+    try:
+        main(sys.argv[1])
+    except Exception as e:  # deja el motivo en el repo para poder revisarlo
+        escribir_log("(sin conectar)", 0, 0, 0, [f"Fallo general: {e}"])
+        raise
