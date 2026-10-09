@@ -132,9 +132,11 @@ def valor_campo(campo, fila):
         return {"date": bruto[:10]} if re.match(r"\d{4}-\d{2}-\d{2}", bruto) else None
     if tipo == "NUMBER":
         try:
-            return {"number": float(bruto)}
+            n = float(bruto)
         except ValueError:
             return None
+        # GitHub no acepta números sobre ~2.147 millones de millones; el monto completo queda en el cuerpo.
+        return {"number": n} if 0 <= n < 2_147_483_647 else None
     if tipo == "SINGLE_SELECT":
         primero = bruto.split("|")[0].strip()
         op = next((o for o in campo.get("options", []) if o["name"].lower() == primero.lower()), None)
