@@ -1,0 +1,5 @@
+# Registro de exportaciones
+
+| Fecha | Origen | Archivo | Licitaciones | Nuevas |
+|---|---|---|---|---|
+| 2026-10-09 09:21 | API Mercado Público (activas) | [licitaciones_2026-10-09.xlsx](datos/diario/licitaciones_2026-10-09.xlsx) | 159 | 159 |
