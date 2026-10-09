@@ -41,3 +41,20 @@ pip install -r requirements.txt
 set MP_TICKET=tu_ticket          # Windows (PowerShell: $env:MP_TICKET="tu_ticket")
 python scripts/licitaciones.py api
 ```
+
+## Tablero en GitHub Projects
+
+Cada ejecución diaria agrega las licitaciones **nuevas** como tarjetas en el proyecto
+[JimLennon77 / proyecto 1](https://github.com/users/JimLennon77/projects/1):
+
+- Título `[Código] Nombre`, con organismo, fechas, monto, descripción y enlace en el cuerpo.
+- Campos: Código, Organismo, Región, Servicio DATAELECT, Cierre, Monto estimado, URL (se crean solos si no existen).
+- Entran en la primera columna del Status (o en "Nueva"/"Por revisar" si existe). Desde ahí las mueves tú.
+- No se duplican: si la tarjeta con ese código ya está, se salta.
+
+Requiere un token personal guardado como secreto `PROJECT_TOKEN`:
+1. GitHub → foto de perfil → *Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token (classic)*.
+2. Nombre: `licitaciones-project`, expiración a elección, y marca solo el permiso **project**.
+3. Copia el token y guárdalo en el repo: *Settings → Secrets and variables → Actions → New repository secret*, nombre `PROJECT_TOKEN`.
+
+Sin ese secreto, el paso se omite y el resto sigue funcionando igual.

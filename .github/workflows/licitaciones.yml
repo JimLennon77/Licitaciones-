@@ -41,6 +41,16 @@ jobs:
           MP_TICKET: ${{ secrets.MP_TICKET }}
         run: python scripts/licitaciones.py api
 
+      - name: Publicar en GitHub Project (tablero de licitaciones)
+        if: github.event_name != 'push'
+        env:
+          PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          PROJECT_OWNER: JimLennon77
+          PROJECT_NUMBER: "1"
+        run: |
+          archivo=$(ls -1 datos/diario/licitaciones_*.csv | sort | tail -n 1)
+          python scripts/proyecto.py "$archivo"
+
       - name: Guardar en el repositorio (trazabilidad)
         run: |
           git config user.name "licitaciones-bot"
