@@ -9,6 +9,8 @@ Requiere la variable de entorno MP_TICKET (ticket de la API de Mercado Público)
 """
 import csv
 import datetime as dt
+import gzip
+import json
 import os
 import re
 import shutil
@@ -39,7 +41,8 @@ TZ = dt.timezone(dt.timedelta(hours=-3))  # Chile continental (aprox.; solo para
 COLUMNAS = [
     ("Codigo", 18), ("Nombre", 60), ("Estado", 12), ("Tipo", 8), ("Organismo", 40),
     ("Unidad", 30), ("Region", 22), ("Comuna", 18), ("FechaPublicacion", 18),
-    ("FechaCierre", 18), ("MontoEstimado", 16), ("Moneda", 8), ("Descripcion", 80),
+    ("FechaCierre", 18), ("FechaVisita", 18), ("VisitaObligatoria", 10), ("FuenteVisita", 14),
+    ("MontoEstimado", 18), ("Moneda", 8), ("MontoVisible", 10), ("Descripcion", 80),
     ("ServicioDATAELECT", 30), ("PalabrasCalzadas", 30), ("URL", 50),
 ]
 CAMPOS_HIST = ["Codigo", "Nombre", "Organismo", "Region", "FechaCierre", "Estado",
@@ -92,10 +95,69 @@ def calza(texto):
     return out
 
 
+_MESES = {"enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6, "julio": 7,
+          "agosto": 8, "septiembre": 9, "setiembre": 9, "octubre": 10, "noviembre": 11, "diciembre": 12}
+
+
+def _fecha_api(valor):
+    """'2026-10-13T10:00:00' -> '2026-10-13 10:00'. Ignora fechas vacías o de relleno (año 1900/0001)."""
+    v = (valor or "").strip()
+    if not v or v[:4] in ("0001", "1900"):
+        return ""
+    return v[:16].replace("T", " ")
+
+
+def visita_terreno(lic):
+    """Devuelve (fecha 'AAAA-MM-DD HH:MM' o '', obligatoria 'Sí'/'No'/'', fuente)."""
+    fechas = lic.get("Fechas") or {}
+    texto = " ".join(str(lic.get(k) or "") for k in ("Descripcion", "Nombre"))
+    t = normalizar(texto)
+    flag = lic.get("VisitaTerreno")
+    obligatoria = ""
+    if "visita" in t and "obligatori" in t:
+        obligatoria = "Sí"
+    elif str(flag) in ("1", "True", "true"):
+        obligatoria = "Sí"
+    # 1) campo oficial del detalle de la licitación
+    for clave in ("FechaVisitaTerreno", "FechaVisita"):
+        f = _fecha_api(fechas.get(clave) or lic.get(clave))
+        if f:
+            return f, obligatoria or "Sí", "Mercado Público"
+    # 2) respaldo: fecha escrita en la descripción cerca de la palabra "visita"
+    for m in re.finditer(r"visita", t):
+        trozo = t[m.start(): m.start() + 220]
+        n = re.search(r"(\d{1,2})\s*[./-]\s*(\d{1,2})\s*[./-]\s*(\d{2,4})", trozo)
+        if n:
+            d, mth, y = int(n.group(1)), int(n.group(2)), int(n.group(3))
+        else:
+            n = re.search(r"(\d{1,2})\s+de\s+(" + "|".join(_MESES) + r")(?:\s+(?:de|del)\s+(\d{4}))?", trozo)
+            if not n:
+                continue
+            d, mth = int(n.group(1)), _MESES[n.group(2)]
+            y = int(n.group(3)) if n.group(3) else ahora().year
+        if y < 100:
+            y += 2000
+        try:
+            fecha = dt.date(y, mth, d)
+        except ValueError:
+            continue
+        h = re.search(r"(\d{1,2})[:.](\d{2})\s*(?:hrs|horas|h\b)", trozo)
+        hora = f" {int(h.group(1)):02d}:{h.group(2)}" if h and int(h.group(1)) < 24 else ""
+        return fecha.isoformat() + hora, obligatoria, "Descripción"
+    if str(flag) in ("0", "False", "false") and not obligatoria:
+        return "", "No", "Mercado Público"
+    return "", obligatoria, ""
+
+
 def fila_desde_detalle(lic, palabras):
     comprador = lic.get("Comprador") or {}
     fechas = lic.get("Fechas") or {}
     codigo = lic.get("CodigoExterno", "")
+    visita = visita_terreno(lic)
+    try:
+        monto = float(lic.get("MontoEstimado") or 0) or ""
+    except (TypeError, ValueError):
+        monto = ""
     return {
         "Codigo": codigo,
         "Nombre": lic.get("Nombre", ""),
@@ -107,8 +169,12 @@ def fila_desde_detalle(lic, palabras):
         "Comuna": comprador.get("ComunaUnidad", ""),
         "FechaPublicacion": (fechas.get("FechaPublicacion") or "")[:16].replace("T", " "),
         "FechaCierre": (fechas.get("FechaCierre") or lic.get("FechaCierre") or "")[:16].replace("T", " "),
-        "MontoEstimado": lic.get("MontoEstimado") or "",
+        "FechaVisita": visita[0],
+        "VisitaObligatoria": visita[1],
+        "FuenteVisita": visita[2],
+        "MontoEstimado": monto,
         "Moneda": lic.get("Moneda", ""),
+        "MontoVisible": {1: "Sí", 0: "No"}.get(lic.get("VisibilidadMonto"), ""),
         "Descripcion": (lic.get("Descripcion") or "").strip(),
         "ServicioDATAELECT": " | ".join(palabras),
         "PalabrasCalzadas": ", ".join(sorted({w for v in palabras.values() for w in v}))[:200],
@@ -131,10 +197,11 @@ def modo_api():
     # si el listado es manejable (evita miles de consultas).
     print(f"  {len(candidatas)} calzan por nombre; descargando detalle...")
 
-    filas = []
+    filas, crudos = [], []
     for i, l in enumerate(candidatas, 1):
         det = get_json({"codigo": l["CodigoExterno"]}, ticket).get("Listado") or [l]
         lic = det[0]
+        crudos.append(lic)
         palabras = calza(f"{lic.get('Nombre')} {lic.get('Descripcion')}")
         if not palabras:
             continue
@@ -151,6 +218,12 @@ def modo_api():
     DIARIO.mkdir(parents=True, exist_ok=True)
     xlsx = DIARIO / f"licitaciones_{hoy}.xlsx"
     escribir_excel(filas, xlsx)
+    # Detalle completo tal como lo entrega Mercado Público (respaldo y trazabilidad)
+    (DATOS / "detalle").mkdir(parents=True, exist_ok=True)
+    with gzip.open(DATOS / "detalle" / f"detalle_{hoy}.json.gz", "wt", encoding="utf-8") as fh:
+        json.dump(crudos, fh, ensure_ascii=False)
+    con_visita = sum(1 for f in filas if f["FechaVisita"])
+    print(f"  Con fecha de visita: {con_visita} · con monto: {sum(1 for f in filas if f['MontoEstimado'])}")
     escribir_csv(filas, DIARIO / f"licitaciones_{hoy}.csv")
     nuevas = actualizar_historial(filas)
     registrar(f"API Mercado Público ({config.ESTADO})", xlsx, len(filas), nuevas)
@@ -224,6 +297,10 @@ def escribir_excel(filas, ruta):
             c.font = Font(color="0563C1", underline="single")
         for j in (enc.index("Nombre") + 1, enc.index("Descripcion") + 1):
             ws.cell(row=i, column=j).alignment = Alignment(wrap_text=True, vertical="top")
+        ws.cell(row=i, column=enc.index("MontoEstimado") + 1).number_format = '#,##0'
+        v = ws.cell(row=i, column=enc.index("FechaVisita") + 1)
+        if v.value:
+            v.fill = PatternFill("solid", fgColor="FFF2CC")
     ws.freeze_panes = "B2"
     ws.auto_filter.ref = ws.dimensions
     res = wb.create_sheet("Por servicio")

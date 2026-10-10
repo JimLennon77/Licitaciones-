@@ -48,7 +48,10 @@ Cada ejecución diaria agrega las licitaciones **nuevas** como tarjetas en el pr
 [JimLennon77 / proyecto 1](https://github.com/users/JimLennon77/projects/1):
 
 - Título `[Código] Nombre`, con organismo, fechas, monto, descripción y enlace en el cuerpo.
-- Campos: Código, Organismo, Región, Servicio DATAELECT, Cierre, Monto estimado, URL (se crean solos si no existen).
+- Campos: Código, Organismo, Región, Servicio DATAELECT, Cierre, **Visita a terreno**, **Monto estimado**, URL (se crean solos si no existen).
+- La fecha de visita sale del detalle oficial de la licitación (`FechaVisitaTerreno`); si viene vacía, se busca en la descripción. En el Excel, la columna `FuenteVisita` indica de dónde salió.
+- Cierre, visita y monto se actualizan también en las tarjetas que ya estaban, sin tocar su Status.
+- **Cada día se eliminan del tablero las tarjetas en estado Done** (o Terminado/Listo). Antes de eliminarlas se guardan en `datos/tablero_done.csv` y no se vuelven a agregar. Para desactivarlo, pon `ELIMINAR_DONE: "0"` en el workflow.
 - Entran en la primera columna del Status (o en "Nueva"/"Por revisar" si existe). Desde ahí las mueves tú.
 - No se duplican: si la tarjeta con ese código ya está, se salta.
 
