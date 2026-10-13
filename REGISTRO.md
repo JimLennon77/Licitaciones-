@@ -9,3 +9,4 @@
 | 2026-10-10 13:04 | API Mercado Público (activas) | [licitaciones_2026-10-10.xlsx](datos/diario/licitaciones_2026-10-10.xlsx) | 214 | 0 |
 | 2026-10-11 13:32 | API Mercado Público (activas) | [licitaciones_2026-10-11.xlsx](datos/diario/licitaciones_2026-10-11.xlsx) | 214 | 0 |
 | 2026-10-12 17:08 | API Mercado Público (activas) | [licitaciones_2026-10-12.xlsx](datos/diario/licitaciones_2026-10-12.xlsx) | 214 | 0 |
+| 2026-10-13 14:56 | API Mercado Público (activas) | [licitaciones_2026-10-13.xlsx](datos/diario/licitaciones_2026-10-13.xlsx) | 226 | 13 |
