@@ -200,6 +200,7 @@ def modo_api():
     filas, crudos = [], []
     for i, l in enumerate(candidatas, 1):
         det = get_json({"codigo": l["CodigoExterno"]}, ticket).get("Listado") or [l]
+        time.sleep(config.PAUSA_SEGUNDOS)
         lic = det[0]
         crudos.append(lic)
         palabras = calza(f"{lic.get('Nombre')} {lic.get('Descripcion')}")
@@ -207,6 +208,8 @@ def modo_api():
             continue
         fila = fila_desde_detalle(lic, palabras)
         if config.REGIONES and not any(normalizar(r) in normalizar(fila["Region"]) for r in config.REGIONES):
+            continue
+        if (fila["FechaPublicacion"] or "")[:10] < getattr(config, "PUBLICADAS_DESDE", ""):
             continue
         filas.append(fila)
         if i % 25 == 0:
