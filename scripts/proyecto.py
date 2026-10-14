@@ -39,6 +39,8 @@ STATUS_DONE = {"done", "terminado", "terminada", "listo", "lista", "finalizado",
 ELIMINAR_DONE = os.environ.get("ELIMINAR_DONE", "1") == "1"
 RAIZ = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 REGISTRO_DONE = os.path.join(RAIZ, "datos", "tablero_done.csv")
+# Si existe este archivo, la ejecución vacía el tablero completo (con respaldo) y luego lo borra.
+MARCA_REINICIO = os.path.join(RAIZ, "datos", ".reiniciar_tablero")
 
 CAMPOS = {  # nombre en el proyecto -> (tipo, columna del CSV)
     "Código": ("TEXT", "Codigo"),
@@ -204,6 +206,35 @@ def eliminar_done(p, tarjetas, status):
     return eliminadas
 
 
+def vaciar_tablero(p, tarjetas):
+    """Elimina TODAS las tarjetas del tablero, guardando antes un respaldo CSV en datos/."""
+    cols = ["Codigo", "Titulo", "Status", "Organismo", "Region", "Cierre", "Visita a terreno",
+            "Monto estimado", "Servicio DATAELECT", "URL"]
+    respaldo = os.path.join(RAIZ, "datos", f"tablero_respaldo_{time.strftime('%Y-%m-%d')}.csv")
+    with open(respaldo, "w", newline="", encoding="utf-8-sig") as fh:
+        w = csv.DictWriter(fh, fieldnames=cols)
+        w.writeheader()
+        for codigo, t in tarjetas.items():
+            v = t["valores"]
+            w.writerow({"Codigo": codigo, "Titulo": t["titulo"], "Status": v.get("Status", ""),
+                        "Organismo": v.get("Organismo", ""), "Region": v.get("Región", ""),
+                        "Cierre": v.get("Cierre", ""), "Visita a terreno": v.get("Visita a terreno", ""),
+                        "Monto estimado": v.get("Monto estimado", ""),
+                        "Servicio DATAELECT": v.get("Servicio DATAELECT", ""), "URL": v.get("URL", "")})
+    borrar = """mutation($pid:ID!,$item:ID!){ deleteProjectV2Item(input:{projectId:$pid,itemId:$item}){ deletedItemId } }"""
+    n = 0
+    for codigo, t in list(tarjetas.items()):
+        try:
+            gql(borrar, pid=p["id"], item=t["id"])
+            tarjetas.pop(codigo)
+            n += 1
+        except RuntimeError as e:
+            print(f"  no se pudo eliminar {codigo}: {e}")
+        time.sleep(0.5)
+    print(f"Tablero vaciado: {n} tarjetas eliminadas (respaldo en {os.path.relpath(respaldo, RAIZ)})")
+    return n
+
+
 def monto_texto(fila):
     """Monto legible: '$ 4.486.154.225' (o con la moneda si no es CLP)."""
     try:
@@ -293,6 +324,10 @@ def main(ruta_csv):
                           [s.lower() for s in STATUS_INICIAL]), status["options"][0])
 
     tarjetas = tarjetas_existentes(p["id"])
+    if os.path.exists(MARCA_REINICIO):
+        vaciar_tablero(p, tarjetas)
+        if not tarjetas:  # solo se quita la marca si quedó vacío; si no, se reintenta en la próxima
+            os.remove(MARCA_REINICIO)
     eliminadas = eliminar_done(p, tarjetas, status)
     excluidas = codigos_done_registrados()
     ya = set(tarjetas)

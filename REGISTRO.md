@@ -1,13 +1,6 @@
 # Registro de exportaciones
 
+Reinicio el 2026-10-14: se eliminó el historial anterior (queda en el historial de commits) y se parte de cero con las licitaciones filtradas por los servicios de DATAELECT.
+
 | Fecha | Origen | Archivo | Licitaciones | Nuevas |
 |---|---|---|---|---|
-| 2026-10-09 09:21 | API Mercado Público (activas) | [licitaciones_2026-10-09.xlsx](datos/diario/licitaciones_2026-10-09.xlsx) | 159 | 159 |
-| 2026-10-09 09:31 | API Mercado Público (activas) | [licitaciones_2026-10-09.xlsx](datos/diario/licitaciones_2026-10-09.xlsx) | 216 | 85 |
-| 2026-10-09 10:12 | API Mercado Público (activas) | [licitaciones_2026-10-09.xlsx](datos/diario/licitaciones_2026-10-09.xlsx) | 215 | 0 |
-| 2026-10-09 22:52 | API Mercado Público (activas) | [licitaciones_2026-10-09.xlsx](datos/diario/licitaciones_2026-10-09.xlsx) | 214 | 14 |
-| 2026-10-10 13:04 | API Mercado Público (activas) | [licitaciones_2026-10-10.xlsx](datos/diario/licitaciones_2026-10-10.xlsx) | 214 | 0 |
-| 2026-10-11 13:32 | API Mercado Público (activas) | [licitaciones_2026-10-11.xlsx](datos/diario/licitaciones_2026-10-11.xlsx) | 214 | 0 |
-| 2026-10-12 17:08 | API Mercado Público (activas) | [licitaciones_2026-10-12.xlsx](datos/diario/licitaciones_2026-10-12.xlsx) | 214 | 0 |
-| 2026-10-13 14:56 | API Mercado Público (activas) | [licitaciones_2026-10-13.xlsx](datos/diario/licitaciones_2026-10-13.xlsx) | 226 | 13 |
-| 2026-10-14 12:36 | API Mercado Público (activas) | [licitaciones_2026-10-14.xlsx](datos/diario/licitaciones_2026-10-14.xlsx) | 205 | 11 |

@@ -11,6 +11,7 @@ on:
     paths:
       - "entrada/**.xlsx"
       - "entrada/**.xls"
+      - "datos/.reiniciar_tablero"
 
 permissions:
   contents: write
@@ -36,13 +37,13 @@ jobs:
         run: python scripts/licitaciones.py entrada
 
       - name: Descargar licitaciones desde la API
-        if: github.event_name != 'push'
+        if: github.event_name != 'push' || hashFiles('datos/.reiniciar_tablero') != ''
         env:
           MP_TICKET: ${{ secrets.MP_TICKET }}
         run: python scripts/licitaciones.py api
 
       - name: Publicar en GitHub Project (tablero de licitaciones)
-        if: github.event_name != 'push'
+        if: github.event_name != 'push' || hashFiles('datos/.reiniciar_tablero') != ''
         continue-on-error: true
         env:
           PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}

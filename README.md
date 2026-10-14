@@ -61,3 +61,9 @@ Requiere un token personal guardado como secreto `PROJECT_TOKEN`:
 3. Copia el token y guárdalo en el repo: *Settings → Secrets and variables → Actions → New repository secret*, nombre `PROJECT_TOKEN`.
 
 Sin ese secreto, el paso se omite y el resto sigue funcionando igual.
+
+## Reiniciar desde cero
+
+Para vaciar el tablero y partir de nuevo, crea el archivo `datos/.reiniciar_tablero` (con cualquier texto) y haz commit.
+Ese commit dispara el flujo: descarga las licitaciones del día, guarda un respaldo de todas las tarjetas en
+`datos/tablero_respaldo_AAAA-MM-DD.csv`, elimina todas las tarjetas del tablero, carga las del día y borra el archivo de aviso.
