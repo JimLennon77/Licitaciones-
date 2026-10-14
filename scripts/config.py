@@ -1,3 +1,6 @@
+# Solo licitaciones publicadas desde esta fecha (AAAA-MM-DD), inclusive. Vacío = sin límite.
+PUBLICADAS_DESDE = "2026-10-14"
+
 """Filtros basados en los servicios de DATAELECT (www.dataelect.cl).
 
 Cada servicio tiene una lista de patrones. Una licitación se guarda si su nombre o
