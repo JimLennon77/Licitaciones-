@@ -20,3 +20,4 @@ Reinicio el 2026-10-14: se eliminó el historial anterior (queda en el historial
 | 2026-10-26 14:06 | API Mercado Público (activas) | [licitaciones_2026-10-26.xlsx](datos/diario/licitaciones_2026-10-26.xlsx) | 141 | 4 |
 | 2026-10-27 13:09 | API Mercado Público (activas) | [licitaciones_2026-10-27.xlsx](datos/diario/licitaciones_2026-10-27.xlsx) | 138 | 20 |
 | 2026-10-28 13:57 | API Mercado Público (activas) | [licitaciones_2026-10-28.xlsx](datos/diario/licitaciones_2026-10-28.xlsx) | 150 | 22 |
+| 2026-10-29 14:12 | API Mercado Público (activas) | [licitaciones_2026-10-29.xlsx](datos/diario/licitaciones_2026-10-29.xlsx) | 156 | 13 |
